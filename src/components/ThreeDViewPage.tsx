@@ -424,17 +424,19 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
     .sort((a: any, b: any) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
   const isParent = children.length > 0;
 
-  // Helper function to resolve dynamic score values (sums children if parent)
+  // Helper function to resolve dynamic score values (sums children if parent + parent's direct score)
   const getScoreValueForTeam = (scoreId: string) => {
     if (isParent) {
-      return children.reduce((sum, child) => sum + (child.scores?.[scoreId] || 0), 0);
+      const parentScore = team?.scores?.[scoreId] || 0;
+      const childrenScore = children.reduce((sum, child) => sum + (child.scores?.[scoreId] || 0), 0);
+      return childrenScore + parentScore;
     }
     return team?.scores?.[scoreId] || 0;
   };
 
-  // Helper function to resolve dynamic max points (scales by children if parent)
-  const getMaxPointsForTeam = (baseMax: number) => {
-    if (isParent) {
+  // Helper function to resolve dynamic max points (scales by children if parent, unless it is an activity)
+  const getMaxPointsForTeam = (baseMax: number, isActivity?: boolean) => {
+    if (isParent && !isActivity) {
       return baseMax * children.length;
     }
     return baseMax;
@@ -1159,7 +1161,7 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                       <Activity className="text-emerald-500" size={20} />
                       <h3 className="text-lg font-black tracking-tight text-slate-800">Other Activities Details</h3>
                     </div>
-                    <span className="text-xs text-slate-450 font-bold">Extra Activities Details</span>
+                    <span className="text-xs text-slate-400 font-bold">Extra Activities Details</span>
                   </div>
 
                   {/* Overall stats banner for Other Activities */}
@@ -1172,24 +1174,24 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                         Object.values(days).forEach(day => {
                           const scoreId = `activity_${key}_${day.id}`;
                           totalEarned += getScoreValueForTeam(scoreId);
-                          grandMax += getMaxPointsForTeam(act.maxPoints);
+                          grandMax += getMaxPointsForTeam(act.maxPoints, true);
                         });
                       } else {
                         const scoreId = `activity_${key}_onetime`;
                         totalEarned += getScoreValueForTeam(scoreId);
-                        grandMax += getMaxPointsForTeam(act.maxPoints);
+                        grandMax += getMaxPointsForTeam(act.maxPoints, true);
                       }
                     });
 
                     return (
-                      <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between">
+                      <div className="bg-[#eefdf5] border border-emerald-200 p-4 rounded-2xl flex items-center justify-between">
                         <div>
                           <div className="text-xs text-emerald-700 uppercase tracking-widest font-black">Total Activities Score</div>
                           <div className="text-slate-500 text-[11px] mt-0.5">Sum of daily points, participation & teamwork</div>
                         </div>
                         <div className="text-right">
                           <span className="text-2xl font-black text-emerald-600 font-mono">{totalEarned}</span>
-                          <span className="text-slate-450 text-xs ml-1">/ {grandMax} PTS</span>
+                          <span className="text-slate-400 text-xs ml-1">/ {grandMax} PTS</span>
                         </div>
                       </div>
                     );
@@ -1204,11 +1206,11 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                       if (act.isDaily) {
                         Object.values(days).forEach(day => {
                           actPoints += getScoreValueForTeam(`activity_${key}_${day.id}`);
-                          actMax += getMaxPointsForTeam(act.maxPoints);
+                          actMax += getMaxPointsForTeam(act.maxPoints, true);
                         });
                       } else {
                         actPoints = getScoreValueForTeam(`activity_${key}_onetime`);
-                        actMax = getMaxPointsForTeam(act.maxPoints);
+                        actMax = getMaxPointsForTeam(act.maxPoints, true);
                       }
 
                       const isExpanded = !!expandedActivities[key];
@@ -1218,7 +1220,7 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                         <div key={key} className="bg-slate-50 border border-slate-200/60 rounded-2xl overflow-hidden shadow-xs hover:border-slate-300 transition-colors">
                           <button
                             onClick={() => setExpandedActivities(prev => ({ ...prev, [key]: !prev[key] }))}
-                            className="w-full text-left p-4 hover:bg-slate-100 transition flex items-center justify-between gap-4"
+                            className="w-full text-left p-4 hover:bg-slate-100 transition flex items-center justify-between gap-4 cursor-pointer"
                           >
                             <div className="min-w-0 flex-1 flex items-center gap-3">
                               <span className="text-2xl select-none shrink-0" role="img" aria-label={act.name}>
@@ -1240,7 +1242,7 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                             </div>
                             
                             <div className="flex items-center gap-3">
-                              <span className="bg-slate-100 text-slate-800 font-black px-3 py-1 rounded-full text-[10px] font-mono leading-relaxed">
+                              <span className="bg-white border border-slate-200 text-slate-800 font-black px-3 py-1 rounded-full text-[10px] font-mono leading-relaxed shadow-sm">
                                 {actPoints} PTS
                               </span>
                               <div className="text-slate-400">
@@ -1267,16 +1269,16 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
 
                               {/* Day by Day Log breakdown */}
                               <div className="space-y-2">
-                                <div className="text-[10px] font-bold text-slate-450 tracking-wider uppercase">Scoring Log</div>
+                                <div className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Scoring Log</div>
                                 {act.isDaily ? (
                                   Object.values(days).map(day => {
                                     const scoreId = `activity_${key}_${day.id}`;
                                     const dayScore = getScoreValueForTeam(scoreId);
-                                    const dayMax = getMaxPointsForTeam(act.maxPoints);
+                                    const dayMax = getMaxPointsForTeam(act.maxPoints, true);
                                     const hasPts = dayScore > 0;
                                     return (
                                       <div key={day.id} className={`flex justify-between items-center bg-slate-50 p-3 rounded-xl text-xs border ${
-                                        hasPts ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100'
+                                        hasPts ? 'border-emerald-200 bg-emerald-50' : 'border-slate-150'
                                       }`}>
                                         <div className="flex items-center gap-2">
                                           <Calendar size={13} className={hasPts ? 'text-emerald-600' : 'text-slate-400'} />
@@ -1286,14 +1288,14 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                                           <span className={`font-black ${hasPts ? 'text-emerald-700' : 'text-slate-500'}`}>
                                             {dayScore}
                                           </span>
-                                          <span className="text-slate-450">/ {dayMax} pts</span>
+                                          <span className="text-slate-400">/ {dayMax} pts</span>
                                         </div>
                                       </div>
                                     );
                                   })
                                 ) : (
                                   <div className={`flex justify-between items-center bg-slate-50 p-3 rounded-xl text-xs border ${
-                                    actPoints > 0 ? 'border-amber-200 bg-amber-50' : 'border-slate-100'
+                                    actPoints > 0 ? 'border-amber-200 bg-amber-50' : 'border-slate-150'
                                   }`}>
                                     <div className="flex items-center gap-2">
                                       <Trophy size={13} className={actPoints > 0 ? 'text-amber-500' : 'text-slate-400'} />
@@ -1303,7 +1305,7 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                                       <span className={`font-black ${actPoints > 0 ? 'text-amber-700' : 'text-slate-500'}`}>
                                         {actPoints}
                                       </span>
-                                      <span className="text-slate-450">/ {getMaxPointsForTeam(act.maxPoints)} pts</span>
+                                      <span className="text-slate-400">/ {getMaxPointsForTeam(act.maxPoints, true)} pts</span>
                                     </div>
                                   </div>
                                 )}
@@ -1315,7 +1317,6 @@ export function ThreeDViewPage({ teamId, onBack }: ThreeDViewPageProps) {
                     })}
                   </div>
                 </div>
-
               </div>
 
               {/* Right Column: Milestones Achievements (5 cols) */}

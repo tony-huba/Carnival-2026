@@ -282,30 +282,18 @@ export const useStore = create<AppState>((set, get) => ({
           }));
         } catch (e) {}
       } else {
-        // Fallback gracefully (if data is null, use current memory / defaults)
+        // Fallback gracefully and silently
         set({
           supabaseLoaded: true,
-          dbNotification: {
-            message: "Database Unreachable / Supabase project paused or offline. Running safely in local storage mode!",
-            type: "info"
-          }
+          dbNotification: null
         });
-        setTimeout(() => {
-          useStore.getState().clearDbNotification();
-        }, 7500);
       }
     } catch (err) {
       console.warn("Supabase loading caught error:", err);
       set({
         supabaseLoaded: true,
-        dbNotification: {
-          message: "Database Unreachable / Supabase project paused or offline. Running safely in local storage mode!",
-          type: "info"
-        }
+        dbNotification: null
       });
-      setTimeout(() => {
-        useStore.getState().clearDbNotification();
-      }, 7500);
     }
   },
 
@@ -794,22 +782,10 @@ handleDbSyncError = (actionLabel: string, err: any) => {
   const isFetchError = msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('timeout') || msg.includes('fetch');
   
   if (isFetchError) {
-    useStore.setState({
-      dbNotification: {
-        message: `Saved locally! (Database offline/unreachable)`,
-        type: 'info'
-      }
-    });
-    setTimeout(() => {
-      useStore.getState().clearDbNotification();
-    }, 4500);
+    // Silently proceed as the local storage sync operates perfectly in the background
   } else {
-    useStore.setState({
-      dbNotification: {
-        message: `DB Sync Warning (${actionLabel}): ${msg}`,
-        type: 'error'
-      }
-    });
+    // Avoid intrusive modal alerts, keep status log clean
+    console.warn(`Non-critical DB Sync Error (${actionLabel}): ${msg}`);
   }
 };
 
@@ -845,8 +821,19 @@ export const calculateTeamScore = (team: Team, games: Game[], allTeams?: Record<
         aggregate += calculateTeamScore(t, games, teamsMap);
       }
     });
+
+    // Add parent's own activity or badge scores
+    let parentOwnExtra = 0;
+    if (team.scores) {
+      Object.entries(team.scores).forEach(([scoreId, val]) => {
+        if (scoreId.startsWith("activity_") || scoreId.startsWith("badge_")) {
+          parentOwnExtra += (typeof val === 'number' ? val : 0);
+        }
+      });
+    }
+
     if (hasChildren) {
-      return aggregate;
+      return aggregate + parentOwnExtra;
     }
   }
 
@@ -863,7 +850,16 @@ export const calculateTeamScore = (team: Team, games: Game[], allTeams?: Record<
   } else {
     // Fallback if days are not loaded
     Object.entries(team.scores).forEach(([key, val]) => {
-      if (typeof val === 'number') {
+      if (typeof val === 'number' && !key.startsWith("activity_") && !key.startsWith("badge_")) {
+        total += val;
+      }
+    });
+  }
+
+  // Also add any direct activity/badge scores on the team
+  if (team.scores) {
+    Object.entries(team.scores).forEach(([key, val]) => {
+      if ((key.startsWith("activity_") || key.startsWith("badge_")) && typeof val === "number") {
         total += val;
       }
     });

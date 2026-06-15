@@ -121,6 +121,10 @@ interface ConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  confirmBtnClassName?: string;
+  cancelBtnClassName?: string;
 }
 
 function ConfirmModal({
@@ -129,6 +133,10 @@ function ConfirmModal({
   message,
   onConfirm,
   onCancel,
+  confirmLabel = "Yes, Confirm",
+  cancelLabel = "Cancel",
+  confirmBtnClassName,
+  cancelBtnClassName,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
   return (
@@ -152,9 +160,12 @@ function ConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+            className={
+              cancelBtnClassName ||
+              "px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+            }
           >
-            Cancel
+            {cancelLabel}
           </button>
           <button
             type="button"
@@ -162,9 +173,12 @@ function ConfirmModal({
               onConfirm();
               onCancel();
             }}
-            className="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-all shadow-md cursor-pointer"
+            className={
+              confirmBtnClassName ||
+              "px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-all shadow-md cursor-pointer"
+            }
           >
-            Yes, Confirm
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -236,6 +250,9 @@ export function AdminDashboard({
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
   const [editDayName, setEditDayName] = useState("");
   const [showDaySettings, setShowDaySettings] = useState(false);
+  
+  // Custom inline delete confirmations
+  const [confirmingDeletes, setConfirmingDeletes] = useState<Record<string, boolean>>({});
 
   // Big Game Day Selector Error state
   const [gameDayError, setGameDayError] = useState<string | null>(null);
@@ -779,6 +796,10 @@ export function AdminDashboard({
     title: string;
     message: string;
     onConfirm: () => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmBtnClassName?: string;
+    cancelBtnClassName?: string;
   }>({
     isOpen: false,
     title: "",
@@ -790,12 +811,20 @@ export function AdminDashboard({
     title: string,
     message: string,
     onConfirm: () => void,
+    confirmLabel?: string,
+    cancelLabel?: string,
+    confirmBtnClassName?: string,
+    cancelBtnClassName?: string,
   ) => {
     setConfirmProps({
       isOpen: true,
       title,
       message,
       onConfirm,
+      confirmLabel,
+      cancelLabel,
+      confirmBtnClassName,
+      cancelBtnClassName,
     });
   };
 
@@ -1313,6 +1342,21 @@ export function AdminDashboard({
             )}
           >
             <span>🏅</span> Team Badges
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftScores({});
+              setActiveTab("activities");
+            }}
+            className={cn(
+              "px-6 py-2.5 rounded-[12px] text-sm font-bold transition cursor-pointer flex items-center gap-1.5",
+              activeTab === "activities"
+                ? "bg-slate-900 text-white shadow"
+                : "text-slate-500 hover:text-slate-900",
+            )}
+          >
+            <span>🎪</span> Other Activities
           </button>
           <button
             type="button"
@@ -4007,16 +4051,16 @@ export function AdminDashboard({
                       : days[selectedDayId]?.name || "Unknown Day";
 
                   // Counts how many teams have a score > 0 for this scope
-                  let subTeamsList = Object.values(teams).filter(
-                    (t) => t.parentId,
-                  );
+                  let parentTeamsList = ["Awlad_Na7mya", "Noo7_&Shorakah"].map(id => teams[id]).filter(Boolean);
                   if (adminUserType === "team" && loggedInTeamId) {
-                    subTeamsList = subTeamsList.filter((t) => t.id === loggedInTeamId);
+                    const userTeam = teams[loggedInTeamId];
+                    const userParentId = userTeam?.parentId || loggedInTeamId;
+                    parentTeamsList = parentTeamsList.filter((t) => t.id === userParentId);
                   }
-                  const completedCount = subTeamsList.filter(
+                  const completedCount = parentTeamsList.filter(
                     (t) => (t.scores[activityScoreId] || 0) > 0,
                   ).length;
-                  const allTeamsCount = subTeamsList.length;
+                  const allTeamsCount = parentTeamsList.length;
 
                   return (
                     <div
@@ -4184,261 +4228,237 @@ export function AdminDashboard({
                             )}
                           </div>
 
-                          {/* Multi-team input grid (Screenshot 3 shows columns side-by-side) */}
+                          {/* Multi-team input grid showing only parent teams */}
                           <div className="space-y-10">
-                            {[
-                              "Awlad_Na7mya",
-                              "Noo7_&Shorakah",
-                            ]
-                              .filter(
-                                (id) =>
-                                  teams[id] &&
-                                  Object.values(teams).some(
-                                    (t) => t.parentId === id,
-                                  ),
-                              )
-                              .map((parentId) => {
-                                const parentCompany = teams[parentId];
-                                if (!parentCompany) return null;
-                                let childTeams = Object.values(teams).filter(
-                                  (t) => t.parentId === parentId,
-                                );
+                            {(() => {
+                              const parentIdsToShow = ["Awlad_Na7mya", "Noo7_&Shorakah"].filter(id => {
+                                const parentCompany = teams[id];
+                                if (!parentCompany) return false;
                                 if (adminUserType === "team" && loggedInTeamId) {
-                                  childTeams = childTeams.filter((t) => t.id === loggedInTeamId);
+                                  const userTeam = teams[loggedInTeamId];
+                                  return userTeam?.parentId === id || loggedInTeamId === id;
                                 }
-                                if (childTeams.length === 0) return null;
+                                return true;
+                              });
 
-                                return (
-                                  <div key={parentId} className="space-y-4">
-                                    {/* Parent Group Header */}
-                                    <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-                                      <span className="text-xl">
-                                        {parentCompany.emojis}
-                                      </span>
-                                      <span className="font-extrabold text-slate-900 text-sm font-sansArabic">
-                                        {parentCompany.nameAr}
-                                      </span>
-                                      <span className="text-xs text-slate-400 font-bold font-mono">
-                                        ({childTeams.length} subgroups)
-                                      </span>
-                                    </div>
+                              return (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                  {parentIdsToShow.map((teamId) => {
+                                    const team = teams[teamId];
+                                    if (!team) return null;
 
-                                    {/* Subgroups Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                      {childTeams.map((team) => {
-                                        const draftScKey = `act-draft-${team.id}-${activityScoreId}`;
-                                        const savedActVal =
-                                          team.scores[activityScoreId] !==
-                                          undefined
-                                            ? team.scores[activityScoreId]
-                                            : "";
-                                        const currentActVal =
-                                          draftScKey in draftScores
-                                            ? draftScores[draftScKey]
-                                            : savedActVal;
-                                        const isDirty =
-                                          currentActVal !== savedActVal;
+                                    const draftScKey = `act-draft-${team.id}-${activityScoreId}`;
+                                    const savedActVal =
+                                      team.scores[activityScoreId] !==
+                                      undefined
+                                        ? team.scores[activityScoreId]
+                                        : "";
+                                    const currentActVal =
+                                      draftScKey in draftScores
+                                        ? draftScores[draftScKey]
+                                        : savedActVal;
+                                    const isDirty =
+                                      currentActVal !== savedActVal;
 
-                                        // One-time stats check
-                                        const hasPoints =
-                                          typeof savedActVal === "number" &&
-                                          savedActVal > 0;
+                                    // One-time stats check
+                                    const hasPoints =
+                                      typeof savedActVal === "number" &&
+                                      savedActVal > 0;
 
-                                        return (
-                                          <div
-                                            key={team.id}
-                                            className={cn(
-                                              "p-5 rounded-2xl border flex flex-col justify-between gap-4 transition-all duration-200 bg-[#FCFDFE]",
-                                              hasPoints && !act.isDaily
-                                                ? "border-emerald-200"
-                                                : "border-slate-150 hover:border-slate-250",
-                                            )}
-                                          >
-                                            {/* Team Arabic Title & Emoji */}
-                                            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                                              <div className="flex items-center gap-2">
-                                                <span className="text-2xl select-none">
-                                                  {team.emojis}
-                                                </span>
-                                                <span className="font-extrabold text-base text-slate-800 font-sansArabic">
-                                                  {team.nameAr}
-                                                </span>
-                                              </div>
-                                              {!act.isDaily && hasPoints && (
-                                                <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-150 rounded-full font-bold uppercase tracking-wider select-none">
-                                                  Completed
-                                                </span>
-                                              )}
-                                            </div>
+                                    return (
+                                      <div
+                                        key={team.id}
+                                        className={cn(
+                                          "p-5 rounded-2xl border flex flex-col justify-between gap-4 transition-all duration-200 bg-[#FCFDFE]",
+                                          hasPoints && !act.isDaily
+                                            ? "border-emerald-200"
+                                            : "border-slate-150 hover:border-slate-250",
+                                        )}
+                                      >
+                                        {/* Team Arabic Title & Emoji */}
+                                        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-2xl select-none">
+                                              {team.emojis}
+                                            </span>
+                                            <span className="font-extrabold text-base text-slate-800 font-sansArabic">
+                                              {team.nameAr}
+                                            </span>
+                                          </div>
+                                          {!act.isDaily && hasPoints && (
+                                            <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-150 rounded-full font-bold uppercase tracking-wider select-none font-sans">
+                                              Completed
+                                            </span>
+                                          )}
+                                        </div>
 
-                                            {/* Point Inputs & Slider */}
-                                            <div className="space-y-4">
-                                              <div className="flex justify-between items-center">
-                                                <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-                                                  Points
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                  <input
-                                                    type="number"
-                                                    min="0"
-                                                    max={act.maxPoints}
-                                                    value={currentActVal}
-                                                    onChange={(e) => {
-                                                      const val =
-                                                        e.target.value === ""
-                                                          ? ""
-                                                          : Number(
-                                                              e.target.value,
-                                                            );
-                                                      // Handle clipping limit typing
-                                                      let numVal: number | "" =
-                                                        val;
-                                                      if (
-                                                        typeof numVal ===
-                                                        "number"
-                                                      ) {
-                                                        if (numVal < 0)
-                                                          numVal = 0;
-                                                        if (
-                                                          numVal > act.maxPoints
-                                                        )
-                                                          numVal =
-                                                            act.maxPoints;
-                                                      }
-                                                      setDraftScores(
-                                                        (prev) => ({
-                                                          ...prev,
-                                                          [draftScKey]: numVal,
-                                                        }),
-                                                      );
-                                                    }}
-                                                    className={cn(
-                                                      "w-16 text-center text-slate-900 font-black bg-white border rounded-xl py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono",
-                                                      isDirty
-                                                        ? "border-amber-400 bg-amber-50/70 ring-2 ring-amber-300"
-                                                        : "border-slate-200",
-                                                    )}
-                                                  />
-                                                  <span className="text-slate-400 font-bold font-sans text-sm">
-                                                    / {act.maxPoints}
-                                                  </span>
-                                                </div>
-                                              </div>
-
-                                              {/* Team Points Progress Slider matching Screenshot 3 */}
-                                              <div className="space-y-1">
-                                                <input
-                                                  type="range"
-                                                  disabled={
-                                                    act.isDaily &&
-                                                    selectedDayId ===
-                                                      "unassigned"
-                                                  }
-                                                  min="0"
-                                                  max={act.maxPoints}
-                                                  value={
-                                                    Number(currentActVal) || 0
-                                                  }
-                                                  onChange={(e) => {
-                                                    const val = parseInt(
-                                                      e.target.value,
-                                                      10,
-                                                    );
-                                                    setDraftScores((prev) => ({
-                                                      ...prev,
-                                                      [draftScKey]: val,
-                                                    }));
-                                                  }}
-                                                  className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-100 accent-emerald-600"
-                                                  style={{
-                                                    background: `linear-gradient(to right, ${team.color || "#059669"} ${((Number(currentActVal) || 0) / act.maxPoints) * 100}%, #f1f5f9 ${((Number(currentActVal) || 0) / act.maxPoints) * 100}%)`,
-                                                  }}
-                                                />
-                                              </div>
-
-                                              {/* Premium Autosave inline triggers - avoids popup friction */}
-                                              {isDirty && (
-                                                <div className="flex gap-2 pt-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      const finalVal =
-                                                        currentActVal === ""
-                                                          ? 0
-                                                          : Number(
-                                                              currentActVal,
-                                                            );
-
-                                                      // Instant commit on state & real Supabase
-                                                      updateScore(
-                                                        team.id,
-                                                        activityScoreId,
-                                                        finalVal,
-                                                      );
-
-                                                      // Save scoring timestamp to register scoring date history nicely
-                                                      const todayStr =
-                                                        new Date().toLocaleDateString(
-                                                          "en-US",
-                                                          {
-                                                            month: "short",
-                                                            day: "numeric",
-                                                            year: "numeric",
-                                                          },
+                                        {/* Point Inputs & Slider */}
+                                        <div className="space-y-4">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
+                                              Points
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max={act.maxPoints}
+                                                value={currentActVal}
+                                                onChange={(e) => {
+                                                  const val =
+                                                    e.target.value === ""
+                                                      ? ""
+                                                      : Number(
+                                                          e.target.value,
                                                         );
-                                                      const updatedDates = {
-                                                        ...activityScoringDates,
-                                                        [activityScoreId]:
-                                                          todayStr,
-                                                      };
-                                                      setActivityScoringDates(
-                                                        updatedDates,
-                                                      );
-                                                      localStorage.setItem(
-                                                        "activity_scoring_dates",
-                                                        JSON.stringify(
-                                                          updatedDates,
-                                                        ),
-                                                      );
-
-                                                      setDraftScores((prev) => {
-                                                        const copy = {
-                                                          ...prev,
-                                                        };
-                                                        delete copy[draftScKey];
-                                                        return copy;
-                                                      });
-                                                    }}
-                                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-[11px] transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
-                                                  >
-                                                    💾 Save Score
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      setDraftScores((prev) => {
-                                                        const copy = {
-                                                          ...prev,
-                                                        };
-                                                        delete copy[draftScKey];
-                                                        return copy;
-                                                      });
-                                                    }}
-                                                    className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition border border-slate-200 cursor-pointer flex items-center justify-center"
-                                                    title="Discard edits"
-                                                  >
-                                                    <Undo size={14} />
-                                                  </button>
-                                                </div>
-                                              )}
+                                                  // Handle clipping limit typing
+                                                  let numVal: number | "" =
+                                                    val;
+                                                  if (
+                                                    typeof numVal ===
+                                                    "number"
+                                                  ) {
+                                                    if (numVal < 0)
+                                                      numVal = 0;
+                                                    if (
+                                                      numVal > act.maxPoints
+                                                    )
+                                                      numVal =
+                                                        act.maxPoints;
+                                                  }
+                                                  setDraftScores(
+                                                    (prev) => ({
+                                                      ...prev,
+                                                      [draftScKey]: numVal,
+                                                    }),
+                                                  );
+                                                }}
+                                                className={cn(
+                                                  "w-16 text-center text-slate-900 font-black bg-white border rounded-xl py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono",
+                                                  isDirty
+                                                    ? "border-amber-400 bg-amber-50/70 ring-2 ring-amber-300"
+                                                    : "border-slate-200",
+                                                )}
+                                              />
+                                              <span className="text-slate-400 font-bold font-sans text-sm">
+                                                / {act.maxPoints}
+                                              </span>
                                             </div>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+
+                                          {/* Team Points Progress Slider matching Screenshot 3 */}
+                                          <div className="space-y-1">
+                                            <input
+                                              type="range"
+                                              disabled={
+                                                act.isDaily &&
+                                                selectedDayId ===
+                                                  "unassigned"
+                                              }
+                                              min="0"
+                                              max={act.maxPoints}
+                                              value={
+                                                Number(currentActVal) || 0
+                                              }
+                                              onChange={(e) => {
+                                                const val = parseInt(
+                                                  e.target.value,
+                                                  10,
+                                                );
+                                                setDraftScores((prev) => ({
+                                                  ...prev,
+                                                  [draftScKey]: val,
+                                                }));
+                                              }}
+                                              className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-100 accent-emerald-600"
+                                              style={{
+                                                background: `linear-gradient(to right, ${team.color || "#059669"} ${((Number(currentActVal) || 0) / act.maxPoints) * 100}%, #f1f5f9 ${((Number(currentActVal) || 0) / act.maxPoints) * 100}%)`,
+                                              }}
+                                            />
+                                          </div>
+
+                                          {/* Premium Autosave inline triggers - avoids popup friction */}
+                                          {isDirty && (
+                                            <div className="flex gap-2 pt-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const finalVal =
+                                                    currentActVal === ""
+                                                      ? 0
+                                                      : Number(
+                                                          currentActVal,
+                                                        );
+
+                                                  // Instant commit on state & real Supabase
+                                                  updateScore(
+                                                    team.id,
+                                                    activityScoreId,
+                                                    finalVal,
+                                                  );
+
+                                                  // Save scoring timestamp to register scoring date history nicely
+                                                  const todayStr =
+                                                    new Date().toLocaleDateString(
+                                                      "en-US",
+                                                      {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                      },
+                                                    );
+                                                  const updatedDates = {
+                                                    ...activityScoringDates,
+                                                    [activityScoreId]:
+                                                      todayStr,
+                                                  };
+                                                  setActivityScoringDates(
+                                                    updatedDates,
+                                                  );
+                                                  localStorage.setItem(
+                                                    "activity_scoring_dates",
+                                                    JSON.stringify(
+                                                      updatedDates,
+                                                    ),
+                                                  );
+
+                                                  setDraftScores((prev) => {
+                                                    const copy = {
+                                                      ...prev,
+                                                    };
+                                                    delete copy[draftScKey];
+                                                    return copy;
+                                                  });
+                                                }}
+                                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-[11px] transition cursor-pointer flex items-center justify-center gap-1 shadow-xs font-sans"
+                                              >
+                                                💾 Save Score
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setDraftScores((prev) => {
+                                                    const copy = {
+                                                      ...prev,
+                                                    };
+                                                    delete copy[draftScKey];
+                                                    return copy;
+                                                  });
+                                                }}
+                                                className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition border border-slate-200 cursor-pointer flex items-center justify-center"
+                                                title="Discard edits"
+                                              >
+                                                <Undo size={14} />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
@@ -4483,11 +4503,20 @@ export function AdminDashboard({
                               return scoredDays.map((sd) => {
                                 const activityScoreIdForDay = `activity_${key}_${sd.dayId}`;
                                 const teamScores = Object.values(teams)
-                                  .filter((t) => adminUserType !== "team" || !loggedInTeamId || t.id === loggedInTeamId)
+                                  .filter((t) => !t.parentId)
+                                  .filter((t) => {
+                                    if (adminUserType === "team" && loggedInTeamId) {
+                                      const userTeam = teams[loggedInTeamId];
+                                      const userParentId = userTeam?.parentId || loggedInTeamId;
+                                      return t.id === userParentId;
+                                    }
+                                    return true;
+                                  })
                                   .map((t) => {
                                     const scoreVal =
                                       t.scores[activityScoreIdForDay];
                                     return {
+                                      id: t.id,
                                       nameAr: t.nameAr,
                                       emojis: t.emojis,
                                       color: t.color,
@@ -4520,27 +4549,51 @@ export function AdminDashboard({
                                       </span>
                                     ) : (
                                       <div className="space-y-1.5">
-                                        {teamScores.map((ts) => (
-                                          <div
-                                            key={ts.nameAr}
-                                            className="flex items-center justify-between text-[11px] font-semibold text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100"
-                                          >
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-base shrink-0 select-none">
-                                                {ts.emojis}
-                                              </span>
-                                              <span className="font-sansArabic font-bold truncate max-w-[120px]">
-                                                {ts.nameAr}
-                                              </span>
+                                        {teamScores.map((ts) => {
+                                          return (
+                                            <div
+                                              key={ts.nameAr}
+                                              className="flex items-center justify-between text-[11px] font-semibold text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100 hover:border-red-100 hover:bg-rose-50/5 transition-colors min-h-[38px] transition-all"
+                                            >
+                                              <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="text-base shrink-0 select-none">
+                                                  {ts.emojis}
+                                                </span>
+                                                <span className="font-sansArabic font-bold truncate max-w-[120px]">
+                                                  {ts.nameAr}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-2 shrink-0">
+                                                <div className="font-extrabold text-[#059669] font-sans">
+                                                  +{ts.score}{" "}
+                                                  <span className="text-[9px] text-slate-400 uppercase font-medium">
+                                                    pts
+                                                  </span>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    triggerConfirm(
+                                                      "Are you sure?",
+                                                      `Are you sure you want to delete these points for ${ts.nameAr}?`,
+                                                      () => {
+                                                        updateScore(ts.id, activityScoreIdForDay, 0);
+                                                      },
+                                                      "Yes",
+                                                      "Cancel",
+                                                      "px-5 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all shadow-md cursor-pointer",
+                                                      "px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-all shadow-md cursor-pointer"
+                                                    );
+                                                  }}
+                                                  className="text-slate-400 hover:text-red-500 hover:bg-slate-100 p-1 rounded transition cursor-pointer"
+                                                  title="حذف النقاط"
+                                                >
+                                                  <Trash2 size={12} />
+                                                </button>
+                                              </div>
                                             </div>
-                                            <div className="font-extrabold text-[#059669] shrink-0 font-sans">
-                                              +{ts.score}{" "}
-                                              <span className="text-[9px] text-slate-400 uppercase font-medium">
-                                                pts
-                                              </span>
-                                            </div>
-                                          </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>
@@ -4548,16 +4601,25 @@ export function AdminDashboard({
                               });
                             })()}
                           </div>
-                        ) : (
-                          <div className="bg-white border border-slate-150 p-4 rounded-2xl">
-                            {(() => {
-                              const activityScoreIdForOnetime = `activity_${key}_onetime`;
+                         ) : (
+                           <div className="bg-white border border-slate-150 p-4 rounded-2xl">
+                             {(() => {
+                               const activityScoreIdForOnetime = `activity_${key}_onetime`;
                                const teamScores = Object.values(teams)
-                                 .filter((t) => adminUserType !== "team" || !loggedInTeamId || t.id === loggedInTeamId)
+                                 .filter((t) => !t.parentId)
+                                 .filter((t) => {
+                                   if (adminUserType === "team" && loggedInTeamId) {
+                                     const userTeam = teams[loggedInTeamId];
+                                     const userParentId = userTeam?.parentId || loggedInTeamId;
+                                     return t.id === userParentId;
+                                   }
+                                   return true;
+                                 })
                                  .map((t) => {
                                    const scoreVal =
                                      t.scores[activityScoreIdForOnetime];
                                    return {
+                                     id: t.id,
                                      nameAr: t.nameAr,
                                      emojis: t.emojis,
                                      color: t.color,
@@ -4595,27 +4657,51 @@ export function AdminDashboard({
                                   </div>
 
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {teamScores.map((ts) => (
-                                      <div
-                                        key={ts.nameAr}
-                                        className="flex items-center justify-between text-[11px] font-semibold text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100"
-                                      >
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-base shrink-0 select-none">
-                                            {ts.emojis}
-                                          </span>
-                                          <span className="font-sansArabic font-bold truncate max-w-[150px]">
-                                            {ts.nameAr}
-                                          </span>
+                                    {teamScores.map((ts) => {
+                                      return (
+                                        <div
+                                          key={ts.nameAr}
+                                          className="flex items-center justify-between text-[11px] font-semibold text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100 min-h-[38px] transition-all"
+                                        >
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-base shrink-0 select-none">
+                                              {ts.emojis}
+                                            </span>
+                                            <span className="font-sansArabic font-bold truncate max-w-[150px]">
+                                              {ts.nameAr}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <div className="font-extrabold text-amber-700 font-sans">
+                                              +{ts.score}{" "}
+                                              <span className="text-[9px] text-slate-400 uppercase font-medium">
+                                                pts
+                                              </span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                triggerConfirm(
+                                                  "Are you sure?",
+                                                  `Are you sure you want to delete these points for ${ts.nameAr}?`,
+                                                  () => {
+                                                    updateScore(ts.id, activityScoreIdForOnetime, 0);
+                                                  },
+                                                  "Yes",
+                                                  "Cancel",
+                                                  "px-5 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all shadow-md cursor-pointer",
+                                                  "px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-all shadow-md cursor-pointer"
+                                                );
+                                              }}
+                                              className="text-slate-400 hover:text-red-500 hover:bg-slate-100 p-1 rounded transition cursor-pointer"
+                                              title="حذف النقاط"
+                                            >
+                                              <Trash2 size={12} />
+                                            </button>
+                                          </div>
                                         </div>
-                                        <div className="font-extrabold text-amber-700 shrink-0 font-sans">
-                                          +{ts.score}{" "}
-                                          <span className="text-[9px] text-slate-400 uppercase font-medium">
-                                            pts
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );
@@ -5602,6 +5688,10 @@ export function AdminDashboard({
         message={confirmProps.message}
         onConfirm={confirmProps.onConfirm}
         onCancel={() => setConfirmProps((p) => ({ ...p, isOpen: false }))}
+        confirmLabel={confirmProps.confirmLabel}
+        cancelLabel={confirmProps.cancelLabel}
+        confirmBtnClassName={confirmProps.confirmBtnClassName}
+        cancelBtnClassName={confirmProps.cancelBtnClassName}
       />
 
       {croppingPlayer && (
