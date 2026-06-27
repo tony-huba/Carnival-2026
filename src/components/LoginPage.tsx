@@ -95,9 +95,12 @@ export function LoginPage({ onLoginAsAdmin, onLoginAsViewer }: LoginPageProps) {
               transition={{ duration: 0.2 }}
               className="w-full flex flex-col items-center"
             >
-              <h1 className="text-4xl font-extrabold text-[#0D1B2A] mb-8 text-center tracking-tight leading-tight">
-                Select Portal
+              <h1 className="text-4xl font-black text-[#0D1B2A] mb-1 text-center tracking-tight leading-tight">
+                Carnival 2026
               </h1>
+              <h2 className="text-lg font-bold text-slate-500 mb-8 text-center tracking-wide">
+                Select Portal
+              </h2>
               
               <div className="w-full space-y-4">
                 <button
