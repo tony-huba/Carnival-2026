@@ -264,16 +264,14 @@ export function AdminDashboard({
   );
 
   // Scoring tab selected day
-  const [selectedDayId, setSelectedDayId] = useState<string>("default-day");
+  const [selectedDayId, setSelectedDayId] = useState<string>("unselected");
 
   // Ensure selectedDayId always points to a valid day (or 'unassigned')
   useEffect(() => {
     if (selectedDayId === "unassigned") return;
+    if (selectedDayId === "unselected") return;
     if (Object.keys(days).length > 0 && !days[selectedDayId]) {
-      const firstId = Object.keys(days)[0];
-      if (firstId) {
-        setSelectedDayId(firstId);
-      }
+      setSelectedDayId("unselected");
     }
   }, [days, selectedDayId]);
 
@@ -2907,10 +2905,12 @@ export function AdminDashboard({
               if (!activeDay) {
                 return (
                   <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 border-dashed text-slate-400 shadow-sm font-sans">
-                    <Calendar className="mx-auto mb-3 text-slate-300" size={36} />
-                    <p className="font-bold text-sm">No Day Selected Or Available</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Please select an existing Day from the pills above, or expand "Manage Days" to create one.
+                    <Calendar className="mx-auto mb-3 text-indigo-400 animate-bounce" size={36} />
+                    <p className="font-extrabold text-sm text-slate-700">Please Select a Day First</p>
+                    <p className="text-xs text-slate-400 mt-1.5 max-w-md mx-auto font-sansArabic font-medium">
+                      Select one of the days from the pills above to see or input scores.
+                      <br />
+                      اختر يوماً من الأزرار في الأعلى لعرض أو إدخال النقاط.
                     </p>
                   </div>
                 );
